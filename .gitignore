@@ -1,0 +1,34 @@
+# Dados financeiros — NUNCA versionar
+extratos/
+data/
+*.db
+*.sqlite
+*.sqlite3
+*.ofx
+*.OFX
+snapshots/
+relatorios/
+exports/
+*.xlsx
+*.xls
+*.csv
+*.pdf
+
+# Segredos (hash da senha de login, chaves de sessão)
+.env
+.env.*
+!.env.example
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# SO / editores
+.DS_Store
+.idea/
+.vscode/
