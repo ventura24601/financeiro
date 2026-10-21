@@ -51,6 +51,8 @@ Código: `financeiro/importadores/` (um leitor por formato → `Extrato`), `impo
 ## Segurança e privacidade
 - **Repositório GitHub é PÚBLICO.** Extratos, banco de dados, relatórios, exportações e qualquer dado financeiro ficam fora do git (ver `.gitignore`).
 - Nada de enviar dados financeiros a serviços externos sem pedido explícito.
+- **Painel web no Netlify** (pedido explícito do CEO, exceção ao "tudo local"): https://painel-fin-799afb.netlify.app — pasta `web/`. `python -m financeiro publicar` gera `web/dados/dados.json` (agregados + lançamentos Itaú de 120 dias, sem CPF/CNPJ, PF só com iniciais, clientes Vindi só somados por dia) e faz `netlify deploy --prod` pela CLI (nunca via git: os dados não vão para o repositório). O JSON é empacotado dentro das funções (`/api/dados`, `/api/analise`), não é arquivo público. Login em `/api/login` com bloqueio (5 erros/IP = 15 min; 30 erros/h = login fechado). Variáveis no Netlify (contexto production, secretas): `APP_PASSWORD_HASH` (scrypt, gerar com `web/scripts/gerar_hash_senha.mjs`), `APP_SECRET_KEY`, `ANTHROPIC_API_KEY`, opcional `CLAUDE_MODEL`.
+- **IA:** `/api/analise` envia os dados compactos (`web/lib/contexto.mjs`) para a API da Claude com prompt caching; resposta em streaming. Projeção dia a dia em `financeiro/projecao.py` (premissas no docstring, backtest mensal).
 - **Login:** o dashboard/app local exige login por senha. A senha **não** é gravada em texto puro nem em arquivo versionado: apenas o hash (bcrypt/argon2) em `.env` local (`APP_PASSWORD_HASH`), gitignored. `.env.example` documenta a variável sem valor.
 
 ## Modelo de DRE gerencial de CAIXA

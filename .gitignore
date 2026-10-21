@@ -32,3 +32,8 @@ venv/
 .DS_Store
 .idea/
 .vscode/
+
+# Painel web
+web/dados/
+web/node_modules/
+web/.netlify/

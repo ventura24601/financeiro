@@ -1,0 +1,96 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="robots" content="noindex, nofollow">
+  <title>Painel Financeiro</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <main id="login" class="login" hidden>
+    <form id="form-login" class="login-card" autocomplete="off">
+      <h1>Painel Financeiro</h1>
+      <p class="muted">ICOM TV · acesso restrito</p>
+      <input id="senha" type="password" inputmode="numeric" placeholder="Senha" aria-label="Senha" required autofocus>
+      <button type="submit">Entrar</button>
+      <p id="erro-login" class="erro" role="alert"></p>
+    </form>
+  </main>
+
+  <div id="app" hidden>
+    <header class="topo">
+      <div class="topo-centro">
+        <h1>Painel Financeiro · ICOM TV</h1>
+        <p class="muted" id="subtitulo"></p>
+      </div>
+      <button id="sair" class="link">Sair</button>
+    </header>
+
+    <section class="kpis" id="kpis"></section>
+
+    <section class="bloco">
+      <h2>Saldo de caixa: realizado e projetado</h2>
+      <p class="muted centro">Itaú (conta + aplicação automática) até a data-base; depois, projeção dia a dia com faixa de incerteza.</p>
+      <div class="grafico alto"><canvas id="g-saldo" aria-label="Gráfico de saldo realizado e projetado"></canvas></div>
+    </section>
+
+    <section class="bloco">
+      <h2>Estimativa do dia</h2>
+      <div class="dia-controle">
+        <button class="link" id="dia-ant" aria-label="Dia anterior">‹</button>
+        <input type="date" id="dia-escolhido" aria-label="Escolha o dia">
+        <button class="link" id="dia-prox" aria-label="Próximo dia">›</button>
+      </div>
+      <div id="dia-detalhe" class="dia-detalhe"></div>
+    </section>
+
+    <section class="bloco">
+      <h2>Próximos 14 dias</h2>
+      <div class="tabela-wrap"><table id="t-dias"></table></div>
+    </section>
+
+    <section class="bloco duas">
+      <div>
+        <h2>Entradas por canal (mês)</h2>
+        <div class="grafico"><canvas id="g-canais" aria-label="Entradas mensais por canal"></canvas></div>
+      </div>
+      <div>
+        <h2>Migração Bambuno → Vindi</h2>
+        <div class="grafico"><canvas id="g-fatia" aria-label="Participação da Vindi nas entradas dos gateways"></canvas></div>
+      </div>
+    </section>
+
+    <section class="bloco">
+      <h2>Pergunte à IA</h2>
+      <p class="muted centro">A IA lê os mesmos dados deste painel (agregados, sem CPF/CNPJ) e explica de onde vem cada número.</p>
+      <div class="sugestoes" id="sugestoes"></div>
+      <div id="chat" class="chat"></div>
+      <form id="form-ia" class="form-ia">
+        <textarea id="pergunta" rows="2" placeholder="Ex.: Quanto devo ter em caixa no dia 30/11 e por quê?" required></textarea>
+        <button type="submit" id="enviar">Perguntar</button>
+      </form>
+    </section>
+
+    <section class="bloco duas">
+      <div>
+        <h2>Saídas recorrentes detectadas</h2>
+        <div class="tabela-wrap baixa"><table id="t-recorrentes"></table></div>
+      </div>
+      <div>
+        <h2>Precisão do modelo</h2>
+        <div id="backtest"></div>
+        <h2 class="mt">Avisos</h2>
+        <ul id="avisos" class="avisos"></ul>
+      </div>
+    </section>
+
+    <footer class="muted centro rodape" id="rodape"></footer>
+  </div>
+
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>

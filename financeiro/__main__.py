@@ -148,14 +148,28 @@ def cmd_status(args) -> int:
     return 0
 
 
+def cmd_publicar(args) -> int:
+    import subprocess
+
+    from .publicar import main as gerar
+
+    gerar()
+    if args.sem_deploy:
+        return 0
+    return subprocess.call(["netlify", "deploy", "--prod", "--message", f"dados {agora()}"], cwd=db.RAIZ / "web")
+
+
 def main(argv=None) -> int:
     p = argparse.ArgumentParser(prog="financeiro")
     sub = p.add_subparsers(dest="cmd", required=True)
     sub.add_parser("importar", help="importa extratos/entrada, deduplica, concilia e move para processados")
     sub.add_parser("conciliar", help="refaz a conciliação de todas as contas")
     sub.add_parser("status", help="resumo do que está no banco")
+    pub = sub.add_parser("publicar", help="gera os dados do painel e publica no Netlify")
+    pub.add_argument("--sem-deploy", action="store_true", help="só gera web/dados/dados.json")
     args = p.parse_args(argv)
-    return {"importar": cmd_importar, "conciliar": cmd_conciliar, "status": cmd_status}[args.cmd](args)
+    return {"importar": cmd_importar, "conciliar": cmd_conciliar, "status": cmd_status,
+            "publicar": cmd_publicar}[args.cmd](args)
 
 
 if __name__ == "__main__":
