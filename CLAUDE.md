@@ -3,7 +3,20 @@
 Camada própria de análise financeira da ICOM TV Corporativa LTDA (SaaS de TV de sala de espera, receita recorrente via Vindi, hardware em comodato, Lucro Real). O ERP oficial continua sendo o ContaAzul; este sistema é alimentado pelo upload de extratos bancários.
 
 ## Como trabalhar neste projeto
-- Trabalhar em **fases** e parar ao fim de cada uma para validação do CEO. Status atual: **Fase 0 (descoberta)**.
+- Trabalhar em **fases** e parar ao fim de cada uma para validação do CEO. Status atual: **Fase 1 entregue, aguardando validação** (pendências da Fase 0: saldos iniciais da conta digital Vindi e dos fundos, ContaAzul, custos fixos, caixa mínimo, empresas relacionadas).
+
+## Como rodar
+```
+python3 -m venv .venv && .venv/bin/pip install -r requirements.txt
+.venv/bin/python -m financeiro importar    # extratos/entrada → banco → conciliação → extratos/processados
+.venv/bin/python -m financeiro status      # contas, o que fica fora da DRE, entradas por canal, saídas
+.venv/bin/python -m financeiro conciliar
+.venv/bin/python -m pytest -q tests
+```
+Código: `financeiro/importadores/` (um leitor por formato → `Extrato`), `importar.py` (dedup, tipo, canal, espelhos, regra Vindi), `conciliacao.py`, `schema.sql`. Configuração editável: `config/contas.yaml` (contas próprias, CNPJs, saldos iniciais) e `config/tipos.yaml` (o que fica fora da DRE e canais de receita). Banco em `data/financeiro.db` (fora do git).
+- Dedup: hash de conta + data + valor + descrição normalizada + **índice de ocorrência** no dia (dois lançamentos idênticos legítimos no mesmo dia não colapsam; reimportação gera os mesmos índices). Arquivo idêntico é reconhecido pelo sha256. Vindi deduplica pelo `Id`.
+- Transferências internas e aplicações geram o **lado espelho** na conta de contrapartida (`espelho_de`), para o caixa consolidado fechar.
+- Divergência de conciliação (exceto dia ainda aberto na exportação) → o comando para, retorna erro e mantém os arquivos em `extratos/entrada`.
 - Protótipo funcionando > documentação longa.
 - Se algum número não fechar (conciliação, duplicidade, transferência suspeita), **parar e avisar** antes de seguir.
 - Nunca inventar categoria. Abaixo do limiar de confiança, o lançamento vai para "pendentes de revisão".

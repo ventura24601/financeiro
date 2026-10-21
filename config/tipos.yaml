@@ -1,0 +1,37 @@
+# Regras de TIPO (Fase 1): decidem o que entra na DRE e o que só mexe no caixa.
+# A primeira regra que casar vence. `padrao` é regex sobre a descrição normalizada
+# (maiúsculas, sem acento, sem datas). `contrapartida` gera o lado espelho na outra conta própria.
+# Repasses de contas próprias (CNPJ em empresa.cnpjs_proprios) são tratados no código
+# (regra anti-dupla contagem da conta digital Vindi, ver CLAUDE.md).
+
+tipos:
+  - nome: Varredura da aplicação automática
+    padrao: '^(APL|RES) APLIC AUT'
+    tipo: varredura_aplicacao
+
+  - nome: Aplicação em fundo próprio
+    padrao: '^APLICACAO '
+    tipo: aplicacao_resgate
+    contrapartida: fundos_itau
+
+  - nome: Resgate de fundo próprio
+    padrao: '^RESGATE '
+    tipo: aplicacao_resgate
+    contrapartida: fundos_itau
+
+# Canal de recebimento (só para entradas operacionais). Casa por CNPJ ou por descrição.
+canais:
+  - canal: bambuno
+    doc: "27012243000104"
+  - canal: bambuno
+    padrao: 'BAMBUNO'
+  - canal: bambuno_cartao
+    doc: "18727053000174"
+  - canal: bambuno_cartao
+    padrao: 'PAGAR\.ME'
+  - canal: vindi
+    doc: "14338304000178"
+  - canal: vindi
+    padrao: 'VINDI|YAPAY'
+  - canal: outros_gateways
+    padrao: 'STRIPE|EVOLUS'

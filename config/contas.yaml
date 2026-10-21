@@ -1,0 +1,32 @@
+# Contas próprias da ICOM TV. O importador só aceita extratos de contas cadastradas aqui.
+# saldo_inicial: informar quando o extrato não traz saldo (gateway, fundos). Formato "1234.56".
+
+empresa:
+  nome: ICOM TV CORPORATIVA LTDA
+  cnpjs_proprios: ["21571448000135"]
+
+contas:
+  - codigo: itau_0384
+    nome: Itaú ag. 0384 c/c 0011020-1
+    banco: itau
+    tipo: corrente
+    agencia: "0384"
+    numero: "0011020-1"
+    identificadores: ["0384/0011020-1"]   # como aparece em Ag/origem de outros extratos
+
+  - codigo: vindi_digital
+    nome: Conta digital Vindi (ICOM TV)
+    banco: vindi
+    tipo: gateway
+    agencia: "0001"
+    numero: "8392-8"
+    identificadores: ["0001/000008392-8"]
+    saldo_inicial: null          # pendente: saldo em 21/07/2026
+    saldo_inicial_data: null
+
+  - codigo: fundos_itau
+    nome: Fundos de investimento (Trust DI, Mix CP RF)
+    banco: itau
+    tipo: investimento
+    saldo_inicial: null          # pendente: saldo em 15/02/2026
+    saldo_inicial_data: null
