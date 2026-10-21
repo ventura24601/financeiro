@@ -12,6 +12,18 @@ Camada própria de análise financeira da ICOM TV Corporativa LTDA (SaaS de TV d
 ## Fases
 0. Descoberta (perguntas) · 1. Banco + importação · 2. DRE + classificação · 3. Custos fixos e recorrência · 4. Caixa e projeção · 5. Comparativos · 6. Evolução/snapshots/anomalias · 7. Comandos `.claude/commands/` e saídas.
 
+## Decisões da Fase 0
+- **Itaú ag. 0384 c/c 0011020-1** — exporta XLSX (cabeçalho + colunas Data, Lançamento, Ag/origem, Razão Social, CPF/CNPJ, Valor, Saldo). Linhas de saldo ("SALDO TOTAL DISPONÍVEL DIA", "SALDO EM CONTA CORRENTE") servem à conciliação, não são lançamentos.
+- **Aplicação automática** (`APL/RES APLIC AUT MAIS`): varredura conta ↔ aplicação; fora da DRE e fora do fluxo. Conciliar pelo "SALDO TOTAL DISPONÍVEL DIA" (conta + aplic. aut.). Dia corrente é parcial (pode faltar rendimento).
+- **Gateways de cobrança = canais de receita**, não contas próprias:
+  - `PIX RECEBIDO ICOM TV` → repasse da conta digital **Vindi** (canal novo).
+  - `PIX RECEBIDO BAMBUNO` → repasse do **Bambuno** (canal antigo).
+  - `TED PAGAR.ME` → vendas no cartão de crédito via Bambuno.
+  - Todo recebimento leva o atributo `canal` para acompanhar a **migração da carteira Bambuno → Vindi** (série mensal de % por canal).
+  - Se um dia o extrato do gateway for importado como conta, o repasse vira transferência interna — evitar dupla contagem.
+- **Fundos próprios** (`APLICACAO TRUST DI`, `APLICACAO MIX CP RF` etc.): contas de investimento da ICOM TV; fora da DRE, dentro do caixa consolidado. Saldo inicial informado pelo CEO na data do extrato; o sistema acompanha aplicações/resgates a partir daí.
+- **Cartão corporativo** (`BUSINESS 4004-3417`): o pagamento da fatura na c/c é transferência para a conta "cartão"; as despesas são classificadas pelos itens da fatura (upload próprio).
+
 ## Convenções técnicas
 - Valores em BRL com `Decimal` (no banco: `NUMERIC(14,2)` / inteiro em centavos). **Nunca float.**
 - Datas no fuso `America/Sao_Paulo`.
