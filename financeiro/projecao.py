@@ -154,12 +154,23 @@ def recorrentes(reais, meses_desp: list[str]):
             por[_chave_saida(r)][_mes(d)].append((d, r["valor_centavos"]))
     itens = []
     for nome, meses in por.items():
-        if len(meses) < 2 or max(len(v) for v in meses.values()) > 3:
+        if len(meses) < 2:
             continue
         somas = [sum(v for _, v in lst) for lst in meses.values()]
+        multiplo = max(len(v) for v in meses.values()) > 3
+        # Muitos pagamentos no mês (ex.: folha via SISPAG) só contam como fixos se o total mensal for estável.
+        if multiplo and statistics.pstdev(somas) / abs(statistics.mean(somas)) > 0.25:
+            continue
         dias = [min(lst)[0].day for lst in meses.values()]
-        itens.append({"nome": nome, "valor": int(statistics.median(somas)), "dia": int(statistics.median(dias)),
-                      "meses": len(meses)})
+        item = {"nome": nome, "valor": int(statistics.median(somas)), "dia": int(statistics.median(dias)),
+                "meses": len(meses)}
+        if multiplo:
+            perfil = defaultdict(float)
+            for lst, soma in zip(meses.values(), somas):
+                for d, v in lst:
+                    perfil[d.day] += v / soma / len(meses)
+            item["perfil"] = {k: round(v, 4) for k, v in sorted(perfil.items())}
+        itens.append(item)
     return sorted(itens, key=lambda i: i["valor"])
 
 
@@ -216,9 +227,11 @@ def projetar(con: sqlite3.Connection, inicio: date, dias: int, saldo_inicial: in
         for d in uteis:
             entradas["outros"][d] += nivel_outros // len(uteis)
             saidas_var[d] += variavel_mes // len(uteis)
+        dias_m = _dias_do_mes(m)
         for it in itens_rec:
-            dd = proximo_dia_util(_dias_do_mes(m)[min(it["dia"], len(_dias_do_mes(m))) - 1])
-            saidas_rec[dd].append({"nome": it["nome"], "valor": it["valor"]})
+            for dom, frac in (it.get("perfil") or {it["dia"]: 1}).items():
+                dd = proximo_dia_util(dias_m[min(dom, len(dias_m)) - 1])
+                saidas_rec[dd].append({"nome": it["nome"], "valor": int(it["valor"] * frac)})
         m = _mes(_dias_do_mes(m)[-1] + timedelta(days=1))
 
     netos = [mensal[m]["vindi"] + mensal[m]["bambuno"] + mensal[m]["outros"] + mensal[m]["saidas"]

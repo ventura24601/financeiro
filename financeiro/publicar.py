@@ -11,7 +11,8 @@ from collections import defaultdict
 from datetime import date, timedelta
 
 from . import db
-from .projecao import _mes, backtest, carregar, meses_completos, projetar, recorrentes, resumo_mensal
+from .projecao import (CARTOES, _chave_saida, _mes, _perfil, backtest, carregar, meses_completos, projetar,
+                       recorrentes, resumo_mensal)
 from .util import agora
 
 SAIDA = db.RAIZ / "web" / "dados" / "dados.json"
@@ -63,13 +64,13 @@ def gerar(con: sqlite3.Connection, cfg_contas: dict) -> dict:
     lanc = []
     vindi_dia = defaultdict(lambda: defaultdict(int))
     for d, r in reais:
-        if d <= corte:
-            continue
         g = {"vindi": "vindi", "bambuno": "bambuno", "bambuno_cartao": "bambuno"}.get(r["canal"], "outros")
         if r["valor_centavos"] > 0:
             dia[d][g] += r["valor_centavos"]
         else:
             dia[d]["saidas"] += r["valor_centavos"]
+        if d <= corte:
+            continue
         if r["conta"] == "vindi_digital":
             meio = r["descricao"].split(" PEDIDO")[0]
             vindi_dia[d][meio] += r["valor_centavos"]
@@ -119,7 +120,61 @@ def gerar(con: sqlite3.Connection, cfg_contas: dict) -> dict:
         "recorrentes": itens,
         "backtests": [backtest(con, m) for m in meses_rec[-2:]],
         "lancamentos_recentes": lanc,
+        "estrategico": estrategico(reais, meses_rec, meses_desp, pf),
         "avisos": avisos,
+    }
+
+
+def estrategico(reais, meses_rec: list[str], meses_desp: list[str], pf: set) -> dict:
+    """Indicadores para as abas Receitas, Despesas e Estratégico."""
+    nome = lambda k: _iniciais(k) if k in pf else k
+
+    # Vindi: clientes pagantes, ticket médio e mix de meios de pagamento (por mês de crédito).
+    vindi = defaultdict(lambda: {"clientes": set(), "bruto": 0, "taxa": 0, "meios": defaultdict(int)})
+    for d, r in reais:
+        if r["conta"] != "vindi_digital":
+            continue
+        m = vindi[_mes(d)]
+        if (r["id_externo"] or "").endswith(":taxa"):
+            m["taxa"] += r["valor_centavos"]
+            continue
+        m["clientes"].add(r["contraparte_nome"])
+        m["bruto"] += r["valor_centavos"]
+        meio = r["descricao"].split(" PEDIDO")[0].replace("VINDI ", "")
+        meio = "Cartão" if any(c in meio for c in CARTOES) else meio.title().replace("Bancario", "")
+        m["meios"][meio.strip()] += r["valor_centavos"]
+    vindi_mensal = [{"mes": k, "clientes": len(v["clientes"]), "bruto": v["bruto"], "taxa": v["taxa"],
+                     "ticket": v["bruto"] // max(1, len(v["clientes"])), "meios": dict(v["meios"])}
+                    for k, v in sorted(vindi.items())]
+
+    # Saídas fixas (recorrentes) x variáveis por mês, e maiores contrapartes dos últimos 3 meses.
+    chaves_fixas = {i["nome"] for i in recorrentes(reais, meses_desp)}
+    fix_var = defaultdict(lambda: {"fixas": 0, "variaveis": 0})
+    por_chave = defaultdict(lambda: defaultdict(int))
+    ult = meses_desp[-3:]
+    for d, r in reais:
+        if r["valor_centavos"] >= 0 or (r["id_externo"] or "").endswith(":taxa"):
+            continue
+        k = _chave_saida(r)
+        fix_var[_mes(d)]["fixas" if k in chaves_fixas else "variaveis"] += r["valor_centavos"]
+        if _mes(d) in ult:
+            por_chave[k][_mes(d)] += r["valor_centavos"]
+    top = sorted(por_chave.items(), key=lambda kv: sum(kv[1].values()))[:15]
+    top_saidas = [{"nome": nome(k), "total": sum(v.values()), "media_mensal": sum(v.values()) // len(ult),
+                   "fixa": k in chaves_fixas, "meses": dict(v)} for k, v in top]
+
+    # Em que dia do mês o dinheiro entra (média dos meses completos, gateways).
+    diario = defaultdict(int)
+    for d, r in reais:
+        if r["valor_centavos"] > 0 and r["canal"] in ("vindi", "bambuno", "bambuno_cartao"):
+            diario[d] += r["valor_centavos"]
+    perfil = _perfil(diario, meses_rec)
+    return {
+        "vindi_mensal": vindi_mensal,
+        "saidas_fixas_variaveis": [dict(v, mes=k) for k, v in sorted(fix_var.items())],
+        "top_saidas": top_saidas,
+        "meses_top_saidas": ult,
+        "perfil_entradas_dia_mes": [round(float(perfil.get(i, 0)), 4) for i in range(1, 32)],
     }
 
 

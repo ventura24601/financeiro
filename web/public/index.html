@@ -29,63 +29,142 @@
       <button id="sair" class="link">Sair</button>
     </header>
 
-    <section class="kpis" id="kpis"></section>
+    <nav class="abas" role="tablist">
+      <button role="tab" data-aba="geral" aria-selected="true">Visão geral</button>
+      <button role="tab" data-aba="comparativos">Comparativos</button>
+      <button role="tab" data-aba="receitas">Receitas</button>
+      <button role="tab" data-aba="despesas">Despesas</button>
+      <button role="tab" data-aba="estrategico">Estratégico</button>
+      <button role="tab" data-aba="ia">Pergunte à IA</button>
+    </nav>
 
-    <section class="bloco">
-      <h2>Saldo de caixa: realizado e projetado</h2>
-      <p class="muted centro">Itaú (conta + aplicação automática) até a data-base; depois, projeção dia a dia com faixa de incerteza.</p>
-      <div class="grafico alto"><canvas id="g-saldo" aria-label="Gráfico de saldo realizado e projetado"></canvas></div>
-    </section>
+    <!-- VISÃO GERAL -->
+    <div class="aba" data-aba="geral">
+      <section class="kpis" id="kpis"></section>
 
-    <section class="bloco">
-      <h2>Estimativa do dia</h2>
-      <div class="dia-controle">
-        <button class="link" id="dia-ant" aria-label="Dia anterior">‹</button>
-        <input type="date" id="dia-escolhido" aria-label="Escolha o dia">
-        <button class="link" id="dia-prox" aria-label="Próximo dia">›</button>
-      </div>
-      <div id="dia-detalhe" class="dia-detalhe"></div>
-    </section>
+      <section class="bloco">
+        <h2>Saldo de caixa: realizado e projetado</h2>
+        <div class="filtros">
+          <div class="seg" id="f-granularidade" role="group" aria-label="Agrupamento">
+            <button data-v="dia" class="ativo">Diário</button><button data-v="semana">Semanal</button><button data-v="mes">Mensal</button>
+          </div>
+          <div class="seg" id="f-periodo" role="group" aria-label="Período do histórico">
+            <button data-v="3">3 meses</button><button data-v="6" class="ativo">6 meses</button><button data-v="0">Tudo</button>
+          </div>
+          <label class="check"><input type="checkbox" id="f-projecao" checked> Mostrar projeção</label>
+        </div>
+        <p class="muted centro nota-grafico" id="nota-saldo"></p>
+        <div class="grafico alto"><canvas id="g-saldo" aria-label="Saldo realizado e projetado"></canvas></div>
+        <details class="tabela-detalhe">
+          <summary>Ver tabela do período</summary>
+          <div class="tabela-wrap baixa"><table id="t-saldo"></table></div>
+        </details>
+      </section>
 
-    <section class="bloco">
-      <h2>Próximos 14 dias</h2>
-      <div class="tabela-wrap"><table id="t-dias"></table></div>
-    </section>
+      <section class="bloco">
+        <h2>Estimativa</h2>
+        <div class="filtros">
+          <div class="seg" id="f-escala" role="group" aria-label="Escala da estimativa">
+            <button data-v="dia" class="ativo">Dia</button><button data-v="semana">Semana</button><button data-v="mes">Mês</button>
+          </div>
+          <div class="nav-data">
+            <button class="link" id="est-ant" aria-label="Anterior">‹</button>
+            <input type="date" id="est-data" aria-label="Data de referência">
+            <button class="link" id="est-prox" aria-label="Próximo">›</button>
+          </div>
+        </div>
+        <div id="est-detalhe" class="est-detalhe"></div>
+      </section>
 
-    <section class="bloco duas">
-      <div>
-        <h2>Entradas por canal (mês)</h2>
-        <div class="grafico"><canvas id="g-canais" aria-label="Entradas mensais por canal"></canvas></div>
-      </div>
-      <div>
-        <h2>Migração Bambuno → Vindi</h2>
-        <div class="grafico"><canvas id="g-fatia" aria-label="Participação da Vindi nas entradas dos gateways"></canvas></div>
-      </div>
-    </section>
+      <section class="bloco">
+        <h2>Próximos 14 dias</h2>
+        <div class="tabela-wrap"><table id="t-dias"></table></div>
+      </section>
+    </div>
 
-    <section class="bloco">
-      <h2>Pergunte à IA</h2>
-      <p class="muted centro">A IA lê os mesmos dados deste painel (agregados, sem CPF/CNPJ) e explica de onde vem cada número.</p>
-      <div class="sugestoes" id="sugestoes"></div>
-      <div id="chat" class="chat"></div>
-      <form id="form-ia" class="form-ia">
-        <textarea id="pergunta" rows="2" placeholder="Ex.: Quanto devo ter em caixa no dia 30/11 e por quê?" required></textarea>
-        <button type="submit" id="enviar">Perguntar</button>
-      </form>
-    </section>
+    <!-- COMPARATIVOS -->
+    <div class="aba" data-aba="comparativos" hidden>
+      <p class="muted centro intro" id="comp-intro"></p>
+      <section class="bloco duas" id="comp-semana"></section>
+      <section class="bloco duas" id="comp-mes"></section>
+      <section class="bloco">
+        <h2>Entradas e saídas por semana</h2>
+        <p class="muted centro">Últimas 16 semanas (segunda a domingo), realizado.</p>
+        <div class="grafico"><canvas id="g-semanas" aria-label="Entradas e saídas semanais"></canvas></div>
+      </section>
+    </div>
 
-    <section class="bloco duas">
-      <div>
+    <!-- RECEITAS -->
+    <div class="aba" data-aba="receitas" hidden>
+      <section class="kpis" id="kpis-receitas"></section>
+      <section class="bloco duas">
+        <div><h2>Entradas por canal (mês)</h2><div class="grafico"><canvas id="g-canais"></canvas></div></div>
+        <div><h2>Migração Bambuno → Vindi</h2><div class="grafico"><canvas id="g-fatia"></canvas></div></div>
+      </section>
+      <section class="bloco duas">
+        <div><h2>Clientes pagantes na Vindi</h2><div class="grafico"><canvas id="g-clientes"></canvas></div></div>
+        <div><h2>Ticket médio Vindi</h2><div class="grafico"><canvas id="g-ticket"></canvas></div></div>
+      </section>
+      <section class="bloco duas">
+        <div><h2>Como os clientes Vindi pagam</h2><div class="grafico"><canvas id="g-meios"></canvas></div></div>
+        <div>
+          <h2>Em que dia do mês o dinheiro entra</h2>
+          <p class="muted centro" id="nota-perfil"></p>
+          <div class="grafico"><canvas id="g-perfil"></canvas></div>
+        </div>
+      </section>
+    </div>
+
+    <!-- DESPESAS -->
+    <div class="aba" data-aba="despesas" hidden>
+      <section class="kpis" id="kpis-despesas"></section>
+      <section class="bloco duas">
+        <div><h2>Saídas fixas × variáveis (mês)</h2><div class="grafico"><canvas id="g-fixvar"></canvas></div></div>
+        <div><h2>Maiores saídas · média mensal</h2><p class="muted centro" id="nota-top"></p><div class="grafico alto"><canvas id="g-top"></canvas></div></div>
+      </section>
+      <section class="bloco">
         <h2>Saídas recorrentes detectadas</h2>
+        <p class="muted centro">Mesma contraparte em pelo menos 2 dos últimos 3 meses. São usadas na projeção, no dia típico de cada uma.</p>
         <div class="tabela-wrap baixa"><table id="t-recorrentes"></table></div>
-      </div>
-      <div>
-        <h2>Precisão do modelo</h2>
-        <div id="backtest"></div>
-        <h2 class="mt">Avisos</h2>
-        <ul id="avisos" class="avisos"></ul>
-      </div>
-    </section>
+      </section>
+    </div>
+
+    <!-- ESTRATÉGICO -->
+    <div class="aba" data-aba="estrategico" hidden>
+      <section class="indicadores" id="indicadores"></section>
+      <section class="bloco">
+        <h2>Simulador de cenários</h2>
+        <p class="muted centro">Mexa nas premissas e veja o efeito no caixa dos próximos 90 dias.</p>
+        <div class="simulador">
+          <label>Entradas <output id="o-ent">0%</output><input type="range" id="s-ent" min="-40" max="40" step="5" value="0"></label>
+          <label>Saídas <output id="o-sai">0%</output><input type="range" id="s-sai" min="-40" max="40" step="5" value="0"></label>
+          <label>Pagamento extra (R$)<input type="number" id="s-pag-valor" min="0" step="1000" placeholder="0"></label>
+          <label>Data do pagamento<input type="date" id="s-pag-data"></label>
+          <label>Recebimento extra (R$)<input type="number" id="s-rec-valor" min="0" step="1000" placeholder="0"></label>
+          <label>Data do recebimento<input type="date" id="s-rec-data"></label>
+        </div>
+        <div class="kpis compacto" id="sim-kpis"></div>
+        <div class="grafico alto"><canvas id="g-cenario" aria-label="Cenário simulado versus projeção base"></canvas></div>
+      </section>
+      <section class="bloco duas">
+        <div><h2>Precisão do modelo</h2><div id="backtest"></div></div>
+        <div><h2>Avisos</h2><ul id="avisos" class="avisos"></ul></div>
+      </section>
+    </div>
+
+    <!-- IA -->
+    <div class="aba" data-aba="ia" hidden>
+      <section class="bloco">
+        <h2>Pergunte à IA</h2>
+        <p class="muted centro">A IA lê os mesmos dados deste painel (agregados, sem CPF/CNPJ) e explica de onde vem cada número.</p>
+        <div class="sugestoes" id="sugestoes"></div>
+        <div id="chat" class="chat"></div>
+        <form id="form-ia" class="form-ia">
+          <textarea id="pergunta" rows="2" placeholder="Ex.: Quanto devo ter em caixa no dia 30/11 e por quê?" required></textarea>
+          <button type="submit" id="enviar">Perguntar</button>
+        </form>
+      </section>
+    </div>
 
     <footer class="muted centro rodape" id="rodape"></footer>
   </div>
