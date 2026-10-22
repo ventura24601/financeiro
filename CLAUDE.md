@@ -8,15 +8,20 @@ Camada própria de análise financeira da ICOM TV Corporativa LTDA (SaaS de TV d
 ## Como rodar
 ```
 python3 -m venv .venv && .venv/bin/pip install -r requirements.txt
-.venv/bin/python -m financeiro importar    # extratos/entrada → banco → conciliação → extratos/processados
+.venv/bin/python -m financeiro importar    # baixa do Supabase → extratos/entrada → conciliação → envia ao Supabase
+.venv/bin/python -m financeiro publicar    # baixa do Supabase → gera dados do painel → publica (--deploy republica o código)
+.venv/bin/python -m financeiro baixar      # só recria a base local a partir do Supabase
 .venv/bin/python -m financeiro status      # contas, o que fica fora da DRE, entradas por canal, saídas
 .venv/bin/python -m financeiro conciliar
+.venv/bin/python -m financeiro processar-uploads   # fila de uploads do painel (normalmente roda no GitHub Actions)
 .venv/bin/python -m pytest -q tests
 ```
 Código: `financeiro/importadores/` (um leitor por formato → `Extrato`), `importar.py` (dedup, tipo, canal, espelhos, regra Vindi), `conciliacao.py`, `schema.sql`. Configuração editável: `config/contas.yaml` (contas próprias, CNPJs, saldos iniciais) e `config/tipos.yaml` (o que fica fora da DRE e canais de receita). Banco em `data/financeiro.db` (fora do git).
 - Dedup: hash de conta + data + valor + descrição normalizada + **índice de ocorrência** no dia (dois lançamentos idênticos legítimos no mesmo dia não colapsam; reimportação gera os mesmos índices). Arquivo idêntico é reconhecido pelo sha256. Vindi deduplica pelo `Id`.
 - Transferências internas e aplicações geram o **lado espelho** na conta de contrapartida (`espelho_de`), para o caixa consolidado fechar.
-- Divergência de conciliação (exceto dia ainda aberto na exportação) → o comando para, retorna erro e mantém os arquivos em `extratos/entrada`.
+- Divergência de conciliação (exceto dia ainda aberto na exportação) → o comando para, retorna erro, **não envia nada ao Supabase** e mantém os arquivos em `extratos/entrada`.
+- **Fonte da verdade = Supabase.** O SQLite local é cache: `importar`, `publicar` e `processar-uploads` recriam a base a partir do Supabase antes de escrever (senão a sincronização apagaria no Supabase o que veio por outro caminho).
+- **Upload pelo painel** (aba "Atualizar dados"): `/api/upload` grava o arquivo no bucket privado `extratos` e uma linha em `processamentos`; o workflow `.github/workflows/processar-uploads.yml` roda `processar-uploads` (disparo imediato se `GITHUB_DISPATCH_TOKEN` estiver no Netlify; senão cron a cada 15 min, seg–sáb 8h–21h). O repo é público: o log do Actions só mostra contagens — o log completo fica em `processamentos.log`, visível no painel. Secrets do repo: `SUPABASE_URL`, `SUPABASE_SERVICE_KEY`. O upload precisa ir como `application/octet-stream` (senão o Netlify trata o binário como texto e corrompe o XLSX).
 - Protótipo funcionando > documentação longa.
 - Se algum número não fechar (conciliação, duplicidade, transferência suspeita), **parar e avisar** antes de seguir.
 - Nunca inventar categoria. Abaixo do limiar de confiança, o lançamento vai para "pendentes de revisão".

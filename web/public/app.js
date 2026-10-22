@@ -78,71 +78,7 @@ $("#form-login").addEventListener("submit", async (e) => {
       return;
     }
     $("#senha").value = "";
-    await // =====================================================================
-// ATUALIZAR DADOS
-// =====================================================================
-const ROTULO_STATUS = { pendente: "na fila", processando: "processando", ok: "concluído", divergencia: "divergência", erro: "erro" };
-let pollTimer = null;
-let ultimaPublicacaoOk = null;
-
-function renderAtualizar() {
-  const zona = $("#zona-upload");
-  const input = $("#arquivos");
-  input.addEventListener("change", () => enviarArquivos([...input.files]));
-  ["dragenter", "dragover"].forEach((ev) => zona.addEventListener(ev, (e) => { e.preventDefault(); zona.classList.add("arrastando"); }));
-  ["dragleave", "drop"].forEach((ev) => zona.addEventListener(ev, (e) => { e.preventDefault(); zona.classList.remove("arrastando"); }));
-  zona.addEventListener("drop", (e) => enviarArquivos([...e.dataTransfer.files]));
-  carregarProcessamentos();
-}
-
-async function enviarArquivos(arquivos) {
-  const msg = $("#upload-msg");
-  for (const f of arquivos) {
-    msg.innerHTML = `<p class="muted">Enviando ${esc(f.name)}…</p>`;
-    const r = await fetch("/api/upload", { method: "POST", headers: { "x-arquivo": encodeURIComponent(f.name), "content-type": "application/octet-stream" }, body: f });
-    if (r.status === 401) return mostrarLogin("Sessão expirada. Entre de novo.");
-    const j = await r.json().catch(() => ({}));
-    if (!r.ok) { msg.innerHTML = `<p class="erro">${esc(f.name)}: ${esc(j.erro || "falha no envio")}</p>`; return; }
-  }
-  $("#arquivos").value = "";
-  msg.innerHTML = `<p class="pos">${arquivos.length} arquivo(s) enviado(s). O processamento começa em instantes.</p>`;
-  carregarProcessamentos();
-}
-
-async function carregarProcessamentos() {
-  clearTimeout(pollTimer);
-  const r = await fetch("/api/upload");
-  if (r.status === 401) return mostrarLogin("Sessão expirada. Entre de novo.");
-  const { processamentos, disparo_automatico } = await r.json();
-  $("#proc-nota").textContent = disparo_automatico
-    ? "O processamento começa logo após o envio e leva cerca de 1 a 2 minutos."
-    : "O processamento roda automaticamente a cada 15 minutos (seg–sáb, 8h–21h). Para processar na hora, configure o GITHUB_DISPATCH_TOKEN.";
-  $("#processamentos").innerHTML = processamentos.length ? processamentos.map((p) => {
-    const rs = p.resumo || {};
-    const detalhe = rs.erro ? `Erro: ${esc(rs.erro)}`
-      : rs.ja_importado ? "Arquivo idêntico já importado antes — nada mudou."
-      : rs.conta ? `${esc(rs.conta)}: ${rs.lidos} lançamentos lidos, <strong>${rs.novos} novos</strong>, ${rs.duplicados} já existiam.` : "";
-    return `<div class="proc">
-      <div class="proc-topo"><strong>${esc(p.arquivo)}</strong><span class="proc-status ${p.status}">${ROTULO_STATUS[p.status] || p.status}</span></div>
-      <div class="muted" style="font-size:12.5px">enviado ${new Date(p.criado_em).toLocaleString("pt-BR")}${p.concluido_em ? ` · concluído ${new Date(p.concluido_em).toLocaleString("pt-BR")}` : ""}</div>
-      ${detalhe ? `<div style="font-size:13.5px;margin-top:6px">${detalhe}</div>` : ""}
-      ${p.status === "divergencia" ? '<div class="erro" style="font-size:13px;margin-top:6px">A conciliação não fechou: nada foi alterado no painel. Veja o detalhe abaixo.</div>' : ""}
-      ${p.log ? `<details><summary>Ver log do processamento</summary><pre>${esc(p.log)}</pre></details>` : ""}
-    </div>`;
-  }).join("") : '<p class="muted centro">Nenhum envio ainda.</p>';
-
-  const ultimoOk = processamentos.find((p) => p.status === "ok");
-  if (ultimaPublicacaoOk !== null && ultimoOk && ultimoOk.id !== ultimaPublicacaoOk) {
-    $("#upload-msg").innerHTML = '<p class="pos">Dados atualizados.</p><button type="button" id="recarregar">Recarregar o painel</button>';
-    $("#recarregar").addEventListener("click", () => location.reload());
-  }
-  ultimaPublicacaoOk = ultimoOk ? ultimoOk.id : 0;
-  if (processamentos.some((p) => p.status === "pendente" || p.status === "processando")) {
-    pollTimer = setTimeout(carregarProcessamentos, 5000);
-  }
-}
-
-iniciar();
+    await iniciar();
   } finally {
     btn.disabled = false;
   }
