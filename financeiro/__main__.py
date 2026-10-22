@@ -1,4 +1,4 @@
-"""CLI: python -m financeiro {importar,status,conciliar}"""
+"""CLI: python -m financeiro {importar,status,conciliar,publicar,baixar,processar-uploads}"""
 from __future__ import annotations
 
 import argparse
@@ -18,26 +18,21 @@ ENTRADA = db.RAIZ / "extratos" / "entrada"
 PROCESSADOS = db.RAIZ / "extratos" / "processados"
 
 
-def cmd_importar(args) -> int:
-    con = db.conectar()
+def importar_arquivos(con, arquivos):
+    """Importa, reavalia repasses e concilia. Devolve (resultados, falhas {arquivo: erro}, divergencia)."""
     cfg_contas, cfg_tipos = db.carregar_config("contas.yaml"), db.carregar_config("tipos.yaml")
     db.sincronizar_contas(con, cfg_contas)
-    arquivos = sorted(p for p in ENTRADA.iterdir() if p.is_file() and not p.name.startswith("."))
-    if not arquivos:
-        print("Nada em extratos/entrada.")
-        return 0
-
-    resultados, ok_para_mover = [], []
+    resultados, falhas = [], {}
     for arq in arquivos:
         try:
             r = importar_arquivo(con, arq, cfg_contas, cfg_tipos)
             con.commit()
         except (FormatoNaoSuportado, KeyError, ValueError) as e:
             con.rollback()
+            falhas[arq.name] = str(e)
             print(f"✗ {arq.name}: {e}")
             continue
         resultados.append(r)
-        ok_para_mover.append(arq)
         if r.ja_importado:
             print(f"= {arq.name}: arquivo idêntico já importado antes")
         else:
@@ -50,13 +45,13 @@ def cmd_importar(args) -> int:
     con.commit()
 
     print("\nConciliação")
-    erros = False
+    divergencia = False
     concs = {}
     for c in con.execute("SELECT id, codigo FROM contas WHERE ativa"):
         conc = conciliar(con, c["id"])
         concs[c["codigo"]] = conc
         print("  " + conc.resumo().replace("\n", "\n  "))
-        erros |= not conc.ok
+        divergencia |= not conc.ok
     for r in resultados:
         if r.importacao_id:
             conc = concs[r.conta]
@@ -65,17 +60,40 @@ def cmd_importar(args) -> int:
     con.execute("INSERT INTO snapshots (criado_em, tipo, referencia, conteudo_json) VALUES (?, 'importacao', ?, ?)",
                 (agora(), ",".join(r.arquivo for r in resultados), json.dumps(_fotografia(con))))
     con.commit()
+    return resultados, falhas, divergencia
 
-    if erros:
-        print("\nPARE: há divergência de conciliação. Os arquivos ficaram em extratos/entrada até revisarmos.")
+
+def abrir_banco():
+    """Supabase é a fonte da verdade: o SQLite local é recriado a partir dele antes de qualquer escrita."""
+    if supabase.configurado():
+        db.DB_PADRAO.unlink(missing_ok=True)
+        con = db.conectar()
+        n = supabase.baixar(con)
+        print(f"Base local atualizada a partir do Supabase ({n} lançamentos).")
+        return con
+    return db.conectar()
+
+
+def cmd_importar(args) -> int:
+    arquivos = sorted(p for p in ENTRADA.iterdir() if p.is_file() and not p.name.startswith("."))
+    if not arquivos:
+        print("Nada em extratos/entrada.")
+        return 0
+    con = abrir_banco()
+    resultados, falhas, divergencia = importar_arquivos(con, arquivos)
+    if divergencia:
+        print("\nPARE: há divergência de conciliação. Nada foi enviado ao Supabase e os arquivos ficaram em "
+              "extratos/entrada até revisarmos.")
         return 1
     PROCESSADOS.mkdir(parents=True, exist_ok=True)
     carimbo = datetime.now(TZ).strftime("%Y%m%d-%H%M%S")
-    for arq in ok_para_mover:
+    movidos = [a for a in arquivos if a.name not in falhas]
+    for arq in movidos:
         shutil.move(str(arq), PROCESSADOS / f"{carimbo}_{arq.name}")
-    print(f"\n{len(ok_para_mover)} arquivo(s) movido(s) para extratos/processados.")
+    print(f"\n{len(movidos)} arquivo(s) movido(s) para extratos/processados.")
     if supabase.configurado():
-        return cmd_sincronizar(args)
+        enviados = supabase.sincronizar(con)
+        print("Supabase sincronizado: " + ", ".join(f"{t} {n}" for t, n in enviados.items()))
     return 0
 
 
@@ -150,25 +168,27 @@ def cmd_status(args) -> int:
     return 0
 
 
-def cmd_sincronizar(args) -> int:
-    if not supabase.configurado():
-        print("Supabase não configurado (SUPABASE_URL / SUPABASE_SERVICE_KEY em .env).")
-        return 1
-    enviados = supabase.sincronizar(db.conectar())
-    print("Supabase sincronizado: " + ", ".join(f"{t} {n}" for t, n in enviados.items()))
+def cmd_baixar(args) -> int:
+    abrir_banco()
     return 0
+
+
+def cmd_processar_uploads(args) -> int:
+    from .nuvem import processar_uploads
+
+    return processar_uploads()
 
 
 def cmd_publicar(args) -> int:
     """Gera os dados do painel e publica no Supabase; o painel no Netlify lê de lá (sem novo deploy)."""
     import subprocess
 
-    from .publicar import main as gerar
+    from .publicar import salvar_local
 
-    dados = gerar()
-    if cmd_sincronizar(args):
-        return 1
-    print(f"Painel atualizado (publicação {supabase.publicar_painel(dados)} no Supabase).")
+    con = abrir_banco()
+    dados = salvar_local(con)
+    if supabase.configurado():
+        print(f"Painel atualizado (publicação {supabase.publicar_painel(dados)} no Supabase).")
     if args.deploy:
         return subprocess.call(["netlify", "deploy", "--prod", "--message", f"código {agora()}"], cwd=db.RAIZ / "web")
     return 0
@@ -180,12 +200,14 @@ def main(argv=None) -> int:
     sub.add_parser("importar", help="importa extratos/entrada, deduplica, concilia e move para processados")
     sub.add_parser("conciliar", help="refaz a conciliação de todas as contas")
     sub.add_parser("status", help="resumo do que está no banco")
-    sub.add_parser("sincronizar", help="envia o banco local para o Supabase")
+    sub.add_parser("baixar", help="recria a base local a partir do Supabase")
+    sub.add_parser("processar-uploads", help="processa extratos enviados pelo painel (usado no GitHub Actions)")
     pub = sub.add_parser("publicar", help="gera os dados do painel e publica no Supabase")
     pub.add_argument("--deploy", action="store_true", help="também republica o código do painel no Netlify")
     args = p.parse_args(argv)
     return {"importar": cmd_importar, "conciliar": cmd_conciliar, "status": cmd_status,
-            "sincronizar": cmd_sincronizar, "publicar": cmd_publicar}[args.cmd](args)
+            "baixar": cmd_baixar, "processar-uploads": cmd_processar_uploads,
+            "publicar": cmd_publicar}[args.cmd](args)
 
 
 if __name__ == "__main__":

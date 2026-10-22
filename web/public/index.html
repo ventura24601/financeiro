@@ -36,6 +36,7 @@
       <button role="tab" data-aba="despesas">Despesas</button>
       <button role="tab" data-aba="estrategico">Estratégico</button>
       <button role="tab" data-aba="ia">Pergunte à IA</button>
+      <button role="tab" data-aba="atualizar">Atualizar dados</button>
     </nav>
 
     <!-- VISÃO GERAL -->
@@ -163,6 +164,26 @@
           <textarea id="pergunta" rows="2" placeholder="Ex.: Quanto devo ter em caixa no dia 30/11 e por quê?" required></textarea>
           <button type="submit" id="enviar">Perguntar</button>
         </form>
+      </section>
+    </div>
+
+    <!-- ATUALIZAR DADOS -->
+    <div class="aba" data-aba="atualizar" hidden>
+      <section class="bloco">
+        <h2>Enviar extrato atualizado</h2>
+        <p class="muted centro">Itaú em XLSX, relatório de transações da Vindi em CSV ou qualquer banco em OFX.
+          Lançamentos já existentes não duplicam: o sistema completa o que falta, atualiza os saldos, refaz a conciliação, a projeção e o painel.</p>
+        <label class="zona-upload" id="zona-upload">
+          <input type="file" id="arquivos" accept=".xlsx,.csv,.ofx" multiple hidden>
+          <strong>Arraste os arquivos aqui</strong>
+          <span class="muted">ou clique para escolher · até 8 MB cada</span>
+        </label>
+        <div id="upload-msg" class="centro"></div>
+      </section>
+      <section class="bloco">
+        <h2>Processamentos</h2>
+        <p class="muted centro" id="proc-nota"></p>
+        <div id="processamentos"></div>
       </section>
     </div>
 

@@ -104,3 +104,46 @@ def publicar_painel(dados: dict, manter: int = 30) -> int:
     novo = _req("POST", "painel_publicacoes?select=id", {"dados": dados}, prefer="return=representation")[0]["id"]
     _req("DELETE", f"painel_publicacoes?id=lte.{novo - manter}")
     return novo
+
+
+def baixar(con: sqlite3.Connection) -> int:
+    """Recria o conteúdo do SQLite local a partir do Supabase (mesmos ids). Devolve nº de lançamentos."""
+    con.execute("PRAGMA foreign_keys = OFF")
+    total = 0
+    for tabela, chave, _booleanas, jsons in TABELAS:
+        ordem = "espelho_de.nullsfirst,id" if tabela == "lancamentos" else chave.split(",")[0]
+        con.execute(f"DELETE FROM {tabela}")
+        pagina = 0
+        while True:
+            lote = _req("GET", f"{tabela}?select=*&order={ordem}&limit=1000&offset={pagina * 1000}")
+            for linha in lote:
+                for c in jsons:
+                    linha[c] = json.dumps(linha[c], ensure_ascii=False)
+                cols = list(linha)
+                con.execute(f"INSERT INTO {tabela} ({','.join(cols)}) VALUES ({','.join('?' * len(cols))})",
+                            [linha[c] for c in cols])
+            if tabela == "lancamentos":
+                total += len(lote)
+            if len(lote) < 1000:
+                break
+            pagina += 1
+    con.commit()
+    con.execute("PRAGMA foreign_keys = ON")
+    return total
+
+
+def baixar_objeto(caminho: str) -> bytes:
+    e = _env()
+    chave = e["SUPABASE_SERVICE_KEY"]
+    req = urllib.request.Request(f"{e['SUPABASE_URL']}/storage/v1/object/extratos/{caminho}",
+                                 headers={"apikey": chave, "Authorization": f"Bearer {chave}"})
+    with urllib.request.urlopen(req, timeout=60) as r:
+        return r.read()
+
+
+def atualizar_processamento(pid: int, **campos) -> None:
+    _req("PATCH", f"processamentos?id=eq.{pid}", campos, prefer="return=minimal")
+
+
+def pendentes() -> list[dict]:
+    return _req("GET", "processamentos?status=eq.pendente&order=id&select=*")

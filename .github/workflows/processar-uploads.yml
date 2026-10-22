@@ -1,0 +1,34 @@
+# Processa os extratos enviados pela aba "Atualizar dados" do painel.
+# Disparado pelo painel (workflow_dispatch) e, como rede de segurança, a cada 15 min em horário comercial.
+# O repositório é público: o log aqui NÃO pode ter valores — o detalhe fica só no Supabase (visível no painel).
+name: Processar uploads de extratos
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "*/15 11-23 * * 1-6"   # 08h–20h45 em Brasília, seg–sáb
+
+concurrency:
+  group: processar-uploads
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  processar:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+      - run: pip install -q -r requirements.txt
+      - name: Processar
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_KEY: ${{ secrets.SUPABASE_SERVICE_KEY }}
+          TZ: America/Sao_Paulo
+        run: python -m financeiro processar-uploads 2>/dev/null | tail -n 1
