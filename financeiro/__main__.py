@@ -8,7 +8,7 @@ import sys
 from collections import defaultdict
 from datetime import datetime
 
-from . import db
+from . import db, supabase
 from .conciliacao import conciliar
 from .importadores import FormatoNaoSuportado
 from .importar import importar_arquivo, reavaliar_repasses
@@ -74,6 +74,8 @@ def cmd_importar(args) -> int:
     for arq in ok_para_mover:
         shutil.move(str(arq), PROCESSADOS / f"{carimbo}_{arq.name}")
     print(f"\n{len(ok_para_mover)} arquivo(s) movido(s) para extratos/processados.")
+    if supabase.configurado():
+        return cmd_sincronizar(args)
     return 0
 
 
@@ -148,15 +150,28 @@ def cmd_status(args) -> int:
     return 0
 
 
+def cmd_sincronizar(args) -> int:
+    if not supabase.configurado():
+        print("Supabase não configurado (SUPABASE_URL / SUPABASE_SERVICE_KEY em .env).")
+        return 1
+    enviados = supabase.sincronizar(db.conectar())
+    print("Supabase sincronizado: " + ", ".join(f"{t} {n}" for t, n in enviados.items()))
+    return 0
+
+
 def cmd_publicar(args) -> int:
+    """Gera os dados do painel e publica no Supabase; o painel no Netlify lê de lá (sem novo deploy)."""
     import subprocess
 
     from .publicar import main as gerar
 
-    gerar()
-    if args.sem_deploy:
-        return 0
-    return subprocess.call(["netlify", "deploy", "--prod", "--message", f"dados {agora()}"], cwd=db.RAIZ / "web")
+    dados = gerar()
+    if cmd_sincronizar(args):
+        return 1
+    print(f"Painel atualizado (publicação {supabase.publicar_painel(dados)} no Supabase).")
+    if args.deploy:
+        return subprocess.call(["netlify", "deploy", "--prod", "--message", f"código {agora()}"], cwd=db.RAIZ / "web")
+    return 0
 
 
 def main(argv=None) -> int:
@@ -165,11 +180,12 @@ def main(argv=None) -> int:
     sub.add_parser("importar", help="importa extratos/entrada, deduplica, concilia e move para processados")
     sub.add_parser("conciliar", help="refaz a conciliação de todas as contas")
     sub.add_parser("status", help="resumo do que está no banco")
-    pub = sub.add_parser("publicar", help="gera os dados do painel e publica no Netlify")
-    pub.add_argument("--sem-deploy", action="store_true", help="só gera web/dados/dados.json")
+    sub.add_parser("sincronizar", help="envia o banco local para o Supabase")
+    pub = sub.add_parser("publicar", help="gera os dados do painel e publica no Supabase")
+    pub.add_argument("--deploy", action="store_true", help="também republica o código do painel no Netlify")
     args = p.parse_args(argv)
     return {"importar": cmd_importar, "conciliar": cmd_conciliar, "status": cmd_status,
-            "publicar": cmd_publicar}[args.cmd](args)
+            "sincronizar": cmd_sincronizar, "publicar": cmd_publicar}[args.cmd](args)
 
 
 if __name__ == "__main__":

@@ -123,10 +123,12 @@ def gerar(con: sqlite3.Connection, cfg_contas: dict) -> dict:
     }
 
 
-def main() -> None:
+def main() -> dict:
+    """Gera os dados do painel e guarda uma cópia local em web/dados/dados.json (para conferência)."""
     con = db.conectar()
     dados = gerar(con, db.carregar_config("contas.yaml"))
     SAIDA.parent.mkdir(parents=True, exist_ok=True)
     SAIDA.write_text(json.dumps(dados, ensure_ascii=False, separators=(",", ":")))
     print(f"{SAIDA.relative_to(db.RAIZ)}: {SAIDA.stat().st_size // 1024} KB, "
           f"{len(dados['lancamentos_recentes'])} lançamentos, projeção até {dados['projecao'][-1]['data']}")
+    return dados

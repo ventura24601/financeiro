@@ -1,11 +1,11 @@
 // POST /api/analise {mensagens:[{role, content}]} → resposta da Claude em streaming (texto puro).
 // Os dados financeiros vão para a API da Anthropic só aqui, por pedido explícito do CEO.
-import dados from "../../dados/dados.json" with { type: "json" };
 import { autenticado, naoAutorizado } from "../../lib/auth.mjs";
 import { dadosCompactos, instrucoes } from "../../lib/contexto.mjs";
+import { carregarDados } from "../../lib/dados.mjs";
 
 const env = (k) => globalThis.Netlify?.env?.get(k) ?? process.env[k];
-const CONTEXTO = dadosCompactos(dados);
+let contexto = { id: null, texto: "" };
 
 export default async (req) => {
   if (!autenticado(req)) return naoAutorizado();
@@ -23,6 +23,13 @@ export default async (req) => {
     .map((m) => ({ role: m.role, content: m.content.slice(0, 8000) }));
   if (!mensagens.length || mensagens.at(-1).role !== "user") return new Response("pergunta vazia", { status: 400 });
 
+  try {
+    const { id, dados } = await carregarDados();
+    if (contexto.id !== id) contexto = { id, texto: dadosCompactos(dados) };
+  } catch (e) {
+    return new Response(`Dados indisponíveis: ${e.message}`, { status: 503 });
+  }
+
   const hoje = new Date().toLocaleDateString("pt-BR", { timeZone: "America/Sao_Paulo", weekday: "long", day: "2-digit", month: "2-digit", year: "numeric" });
   const resp = await fetch("https://api.anthropic.com/v1/messages", {
     method: "POST",
@@ -34,7 +41,7 @@ export default async (req) => {
       system: [
         { type: "text", text: instrucoes(hoje) },
         // Bloco grande e estável: fica em cache entre perguntas para reduzir custo e latência.
-        { type: "text", text: `DADOS (JSON, valores em R$):\n${CONTEXTO}`, cache_control: { type: "ephemeral" } },
+        { type: "text", text: `DADOS (JSON, valores em R$):\n${contexto.texto}`, cache_control: { type: "ephemeral" } },
       ],
       messages: mensagens,
     }),
